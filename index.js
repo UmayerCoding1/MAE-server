@@ -31,8 +31,12 @@ async function run() {
     await client.connect();
 
     const userCollection = client.db("MAE").collection("users");
-    // user api
+    const hrCollection = client.db("MAE").collection("hr");
+    const employeeCollection = client.db("MAE").collection("employee");
+    // exx
+    const exxCollection = client.db("MAE").collection('exx');
 
+    // user api
     app.get("/users", async (req, res) => {
       const result = await userCollection.find().toArray();
       res.send(result);
@@ -40,7 +44,7 @@ async function run() {
     app.get("/users-role", async (req, res) => {
       const query = req.query.email;
 
-      const result = await userCollection.find({ email: query }).toArray();
+      const result = await hrCollection.find({ email: query }).toArray();
       res.send(result);
     });
 
@@ -58,15 +62,28 @@ async function run() {
         memberPackage,
         role: "hr",
       };
+      const userHr = {
+        name,
+        email,
+        companyName,
+        memberPackage,
+        role: "hr",
+      };
 
-      const query = { email: email };
-      const user = await userCollection.findOne(query);
+      const queryUser = { email: email };
+      const user = await userCollection.findOne(queryUser);
       if (user) {
         return res.send({ message: "user already exists", insertId: null });
       }
+      const queryHr = { email: email };
+      const existHr = await hrCollection.findOne(queryHr);
+      if (existHr) {
+        return res.send({ message: "hr already exists", insertId: null });
+      }
 
-      const result = await userCollection.insertOne(hr);
-      res.send(result);
+      const result = await userCollection.insertOne(userHr);
+      const hrResult = await hrCollection.insertOne(hr);
+      res.send(hrResult);
     });
 
     //update hr data  after payment
@@ -75,13 +92,89 @@ async function run() {
       const filter = { _id: new ObjectId(hrId) };
       const updatedDoc = {
         $set: {
-          paymentStatus: paymentStatus,
+          paymentStatus: paymentStatus || "",
           transactionId: transactionId,
         },
       };
 
       const result = await userCollection.updateOne(filter, updatedDoc);
-      res.send(result);
+      const hrResult = await hrCollection.updateOne(filter, updatedDoc);
+      res.send(hrResult);
+    });
+
+    //  employee api
+   
+    // get all employee data
+    app.get('/employee', async(req,res) => {
+      const l =await employeeCollection.estimatedDocumentCount();
+      
+      if(l >= 8){
+        return res.status(404).send({message: 'Sorry hr your employee added limit is close(Please more package)',  insertedId: null})
+      }
+      res.send({l});
+    })
+
+    // create a employee
+    app.post("/add-employee", async (req, res) => {
+      const {
+        name,
+        email,
+        password,
+        dob,
+        companyName,
+        emCategory,
+        emImage,
+        emDetails,
+        hrId,
+        companyLogo,
+        joinDate,
+        memberPackage
+      } = req.body;
+     const packageLength = parseInt(memberPackage);
+      const emUser = {
+        name,
+        email,
+        dob,
+        role: "employee",
+        hrId,
+        joinDate,
+        emCategory,
+        companyName,
+      };
+      const em = {
+        name,
+        email,
+        password,
+        dob,
+        companyName,
+        emCategory,
+        emImage,
+        emDetails,
+        hrId,
+        companyLogo,
+        joinDate,
+        role: "employee",
+      };
+
+      const queryUser = { email: email };
+      const user = await userCollection.findOne(queryUser);
+      if (user) {
+        return res.send({ message: "user already exists", insertId: null });
+      }
+      const queryEm = { email: email };
+      const existEm = await hrCollection.findOne(queryEm);
+      if (existEm) {
+        return res.send({ message: "employee already exists", insertId: null });
+      }
+
+      const packageLimit = await employeeCollection.estimatedDocumentCount();
+      if(packageLimit >= packageLength){
+        return res.status(404).send({message: 'Sorry hr your employee added limit is close(Please more package)',  insertedId: null})
+      }
+
+      const result = await userCollection.insertOne(emUser);
+      const emResult = await employeeCollection.insertOne(em);
+      res.send(emResult);
     });
 
     // hr payment intent
@@ -116,6 +209,3 @@ run().catch(console.dir);
 app.listen(port, () => {
   console.log(`This Manage asset explorer (MAE) server running PORT:${port}`);
 });
-
-
-
